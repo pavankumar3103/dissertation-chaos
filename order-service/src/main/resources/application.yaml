@@ -3,8 +3,8 @@ spring:
     name: order-service
   datasource:
     url: jdbc:postgresql://localhost:5432/orderdb
-    username: postgres
-    password: password
+    username: pavan-work
+    password:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
