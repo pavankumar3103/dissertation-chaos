@@ -33,7 +33,7 @@ public class InventoryController {
                 request.sku(),
                 request.name(),
                 request.price(),
-                request.quantity()
+                request.quantityAvailable()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(item);
     }
@@ -56,6 +56,6 @@ public class InventoryController {
             String sku,
             String name,
             BigDecimal price,
-            Integer quantity
+            int quantityAvailable
     ) {}
 }

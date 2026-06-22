@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/order_db
+    password: password
+
+services:
+  inventory:
+    base-url: http://inventory-service:8082
+  payment:
+    base-url: http://payment-service:8083

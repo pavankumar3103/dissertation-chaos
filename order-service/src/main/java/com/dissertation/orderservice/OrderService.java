@@ -1,48 +1,63 @@
 package com.dissertation.orderservice;
 
+import com.dissertation.orderservice.client.InventoryClient;
+import com.dissertation.orderservice.client.PaymentClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final InventoryClient inventoryClient;
+    private final PaymentClient paymentClient;
 
-    public Order placeOrder(double totalAmount) {
-        Order order = new Order(totalAmount);
-        return orderRepository.save(order);
-    }
+    @Transactional
+    public Order placeOrder(String sku, int quantity, BigDecimal totalAmount) {
+        Order order = new Order(sku, quantity, totalAmount);
+        order = orderRepository.save(order);
 
-    public Order confirmOrder(String orderId) {
-        Order order = findOrderById(orderId);
+        boolean stockReserved = inventoryClient.reserveStock(sku, quantity);
+        if (!stockReserved) {
+            order.fail();
+            orderRepository.save(order);
+            throw new IllegalStateException("Insufficient stock for SKU: " + sku);
+        }
+
+        PaymentClient.PaymentResult result =
+                paymentClient.processPayment(order.getId(), totalAmount);
+
+        if (!result.isCompleted()) {
+            order.fail();
+            orderRepository.save(order);
+            throw new IllegalStateException("Payment declined for order: " + order.getId());
+        }
+
         order.confirm();
         return orderRepository.save(order);
     }
 
-    public Order completeOrder(String orderId){
-        Order order = findOrderById(orderId);
-        order.complete();
-        return orderRepository.save(order);
+    @Transactional(readOnly = true)
+    public Order getOrder(UUID id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + id));
     }
 
-    public Order cancelOrder(String orderId){
-        Order order =  findOrderById(orderId);
-        order.cancel();
-        return orderRepository.save(order);
-    }
-
-    public List<Order> getAllOrders(){
+    @Transactional(readOnly = true)
+    public List<Order> getAllOrders() {
         return orderRepository.findAll();
     }
 
-    public Order getOrder(String orderId){
-        return findOrderById(orderId);
-    }
-    private Order findOrderById(String orderId) {
-        return orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found" + orderId));
+    @Transactional
+    public Order cancelOrder(UUID id) {
+        Order order = getOrder(id);
+        order.cancel();
+        return orderRepository.save(order);
     }
 }

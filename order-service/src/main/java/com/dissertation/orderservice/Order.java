@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -11,39 +13,60 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 public class Order {
+
     @Id
-    private String orderId;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(nullable = false)
+    private String sku;
+
+    @Column(nullable = false)
+    private int quantity;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal totalAmount;
 
     @Enumerated(EnumType.STRING)
-    private OrderStatus orderStatus;
+    @Column(nullable = false)
+    private OrderStatus status;
 
-    private double totalAmount;
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
 
-    public Order(double totalAmount){
-        this.orderId = UUID.randomUUID().toString();
+    public Order(String sku, int quantity, BigDecimal totalAmount) {
+        this.sku = sku;
+        this.quantity = quantity;
         this.totalAmount = totalAmount;
-        this.orderStatus = OrderStatus.PENDING;
+        this.status = OrderStatus.PENDING;
+        this.createdAt = Instant.now();
     }
 
-    public void confirm(){
-        if(orderStatus != OrderStatus.PENDING){
-            throw new IllegalStateException("Only Pending Orders can be confirmed.");
+    public void confirm() {
+        if (status != OrderStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING orders can be confirmed");
         }
-        this.orderStatus = OrderStatus.CONFIRMED;
+        this.status = OrderStatus.CONFIRMED;
     }
 
-    public void cancel(){
-        if(orderStatus != OrderStatus.CONFIRMED){
-            throw new IllegalStateException("Only Confirmed Orders can be cancelled.");
+    public void fail() {
+        if (status != OrderStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING orders can be failed");
         }
-        this.orderStatus = OrderStatus.CANCELLED;
+        this.status = OrderStatus.FAILED;
     }
 
-    public void complete(){
-        if(orderStatus != OrderStatus.CONFIRMED){
-            throw new IllegalStateException("Only Confirmed Orders can be completed.");
+    public void cancel() {
+        if (status != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("Only CONFIRMED orders can be cancelled");
         }
-        this.orderStatus = OrderStatus.COMPLETED;
+        this.status = OrderStatus.CANCELLED;
     }
 
+    public void complete() {
+        if (status != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("Only CONFIRMED orders can be completed");
+        }
+        this.status = OrderStatus.COMPLETED;
+    }
 }

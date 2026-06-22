@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pavan-work
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - dissertation-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pavan-work -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  inventory-service:
+    build: ./inventoryservice
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inventory_db
+      SPRING_DATASOURCE_USERNAME: pavan-work
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8082:8082"
+    networks:
+      - dissertation-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payment-service:
+    build: ./paymentservice
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: pavan-work
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8083:8083"
+    networks:
+      - dissertation-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-service:
+    build: ./order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
+      SPRING_DATASOURCE_USERNAME: pavan-work
+      SPRING_DATASOURCE_PASSWORD: password
+      SERVICES_INVENTORY_BASE_URL: http://inventory-service:8082
+      SERVICES_PAYMENT_BASE_URL: http://payment-service:8083
+    ports:
+      - "8081:8081"
+    networks:
+      - dissertation-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    ports:
+      - "8474:8474"
+      - "18082:18082"
+      - "18083:18083"
+    networks:
+      - dissertation-net
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - dissertation-net
+    depends_on:
+      - order-service
+      - inventory-service
+      - payment-service
+
+networks:
+  dissertation-net:
+    driver: bridge

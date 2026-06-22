@@ -2,7 +2,7 @@ spring:
   application:
     name: order-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/orderdb
+    url: jdbc:postgresql://localhost:5432/order_db
     username: pavan-work
     password:
     driver-class-name: org.postgresql.Driver
@@ -17,3 +17,9 @@ spring:
 
 server:
   port: 8081
+
+services:
+  inventory:
+    base-url: http://localhost:8082
+  payment:
+    base-url: http://localhost:8083
