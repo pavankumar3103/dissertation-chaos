@@ -1,5 +1,8 @@
 package com.dissertation.orderservice.client;
 
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -19,6 +22,9 @@ public class InventoryClient {
         this.baseUrl = baseUrl;
     }
 
+    @CircuitBreaker(name = "inventoryService", fallbackMethod = "reserveStockFallback")
+    @Bulkhead(name = "inventoryService", fallbackMethod = "reserveStockFallback")
+    @Retry(name = "inventoryService", fallbackMethod = "reserveStockFallback")
     public boolean reserveStock(String sku, int quantity) {
         try {
             String url = baseUrl + "/inventory/" + sku + "/reserve?quantity=" + quantity;
@@ -29,5 +35,9 @@ public class InventoryClient {
         } catch (HttpClientErrorException.NotFound e) {
             return false;
         }
+    }
+
+    public boolean reserveStockFallback(String sku, int quantity, Throwable t) {
+        throw new RuntimeException("Inventory service unavailable for SKU: " + sku, t);
     }
 }

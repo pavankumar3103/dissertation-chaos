@@ -1,0 +1,19 @@
+resilience4j:
+  circuitbreaker:
+    instances:
+      inventoryService:
+        registerHealthIndicator: false
+      paymentService:
+        registerHealthIndicator: false
+  bulkhead:
+    instances:
+      inventoryService:
+        maxConcurrentCalls: 1000
+      paymentService:
+        maxConcurrentCalls: 1000
+  retry:
+    instances:
+      inventoryService:
+        maxAttempts: 1
+      paymentService:
+        maxAttempts: 1

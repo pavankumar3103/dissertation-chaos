@@ -1,5 +1,8 @@
 package com.dissertation.orderservice.client;
 
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -26,6 +29,9 @@ public class PaymentClient {
         }
     }
 
+    @CircuitBreaker(name = "paymentService", fallbackMethod = "processPaymentFallback")
+    @Bulkhead(name = "paymentService", fallbackMethod = "processPaymentFallback")
+    @Retry(name = "paymentService", fallbackMethod = "processPaymentFallback")
     public PaymentResult processPayment(UUID orderId, BigDecimal amount) {
         String url = baseUrl + "/payments";
         var body = Map.of(
@@ -40,5 +46,9 @@ public class PaymentClient {
 
         String status = (String) response.get("status");
         return new PaymentResult(status);
+    }
+
+    public PaymentResult processPaymentFallback(UUID orderId, BigDecimal amount, Throwable t) {
+        throw new RuntimeException("Payment service unavailable for order: " + orderId, t);
     }
 }
