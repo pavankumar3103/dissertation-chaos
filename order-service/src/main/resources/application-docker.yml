@@ -5,6 +5,6 @@ spring:
 
 services:
   inventory:
-    base-url: http://inventory-service:8082
+    base-url: http://toxiproxy:18082
   payment:
-    base-url: http://payment-service:8083
+    base-url: http://toxiproxy:18083
