@@ -23,3 +23,21 @@ services:
     base-url: http://localhost:8082
   payment:
     base-url: http://localhost:8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+        resilience4j.circuitbreaker.calls: 0.5,0.95,0.99
+      percentiles-histogram:
+        http.server.requests: true
