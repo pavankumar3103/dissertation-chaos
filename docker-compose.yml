@@ -53,7 +53,14 @@ services:
   order-service:
     build: ./order-service
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      # RESILIENCE_PROFILE selects which of the four Phase 6 profiles
+      # (none / circuit-breaker / bulkhead / combined) layers on top of the
+      # base "docker" profile. Defaults to "none" so `docker compose up` with
+      # no env var set behaves exactly as it did before Phase 10 (additive
+      # change, not a structural one). The Phase 10 experiment runner sets
+      # RESILIENCE_PROFILE in its own environment before calling
+      # `docker compose up -d --force-recreate order-service` for each cell.
+      SPRING_PROFILES_ACTIVE: docker,${RESILIENCE_PROFILE:-none}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
       SPRING_DATASOURCE_USERNAME: pavan-work
       SPRING_DATASOURCE_PASSWORD: password

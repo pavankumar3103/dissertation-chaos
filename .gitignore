@@ -4,3 +4,11 @@
 **/*.class
 **/__pycache__/
 .DS_Store
+
+# Phase 10 — synthetic --dry-run output and the run log are local-only
+# scratch, not real trial data. trials.csv / trials.jsonl (the real
+# results) are intentionally NOT ignored — that's the dissertation's raw
+# experimental data and belongs in version control.
+experiment-runner/results/dryrun_trials.csv
+experiment-runner/results/dryrun_trials.jsonl
+experiment-runner/results/run.log
