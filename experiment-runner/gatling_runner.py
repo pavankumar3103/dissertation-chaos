@@ -16,20 +16,32 @@ byte-offset assumption would produce confident-looking garbage percentiles.
 
 Instead, this module parses the plain-text "Global Information" summary
 block Gatling prints to stdout at the end of every `mvn gatling:test` run.
-That console format has been stable and documented across Gatling 2.x-3.x
-and is what most third-party CI integrations parse — but I have NOT been
-able to run Gatling in this sandbox (no Docker/JDK21/Maven available) to
-capture a real sample of it for THIS version and confirm the regexes below
-match exactly. `run_experiment.py --smoke` is designed to surface a parse
-failure immediately and loudly (raising with the raw captured stdout
-attached) rather than silently recording zeros, specifically so this gets
-caught on the first real trial instead of trial #200.
 
-Net effect: total request count, OK/KO count, and p50/p95/p99 response time
-come from Gatling's own console summary (this module). Error-rate-over-time
-and recovery time come from Prometheus instead (metrics_collector.py),
-which was verified working end-to-end in Phase 9 — so the runner doesn't
-depend on the binary log for any of the five planned metrics.
+REGEX HISTORY — this was wrong once already, fixed against real output:
+The first version of these patterns was written blind (no way to run
+Gatling in the sandbox that built it) against the OLD Gatling 2.x/early
+3.x console format: `> request count    45 (OK=42     KO=3     )`. Pavan's
+first real --smoke run (2026-06-30) failed all 16 trials against that
+version — correctly, loudly, exactly as designed — and the captured stdout
+dumps in results/run.log showed Gatling 3.15.1 actually prints a
+pipe-delimited table with comma-thousands-separated numbers instead:
+
+    ---- Global Information ----------------|---Total---|-----OK----|----KO----
+    > request count                         |       144 |       144 |         -
+    > response time 95th percentile (ms)    |     2,531 |     2,531 |         -
+    > mean throughput (rps)                 |      2.15 |      2.15 |         -
+
+and, separately, under an earlier "---- Requests ----" section:
+
+    > Global                                |       144 |       144 |         0
+
+The patterns below were rewritten against that real captured text (not
+guessed again) — see _to_num() for the comma-stripping this format needs
+that the old one didn't. Still worth treating as "confirmed against 0-KO
+trials only": every one of Pavan's 16 smoke trials had KO=0, so the KO
+column's non-dash, non-zero format has not actually been observed yet.
+If a future trial has real KOs and the parser misbehaves on that column,
+that's the specific gap to look at first.
 """
 
 import re
@@ -44,6 +56,12 @@ import config
 
 class GatlingRunError(RuntimeError):
     pass
+
+
+def _to_num(s: str) -> float:
+    """Gatling 3.15.1's table format uses comma thousands separators
+    (e.g. "2,531"); strip them before float() or it raises."""
+    return float(s.replace(",", "").strip())
 
 
 @dataclass
@@ -68,21 +86,34 @@ class GatlingResult:
         return self.ko_count / self.request_count
 
 
-# Anchors into Gatling's "Global Information" console summary block.
-# Tolerant of arbitrary whitespace; each captures the *first* numeric value
-# on the line (Gatling's overall figure, before the "(OK=... KO=...)" split).
+# Anchors into Gatling 3.15.1's pipe-delimited "Global Information" console
+# table (see module docstring for a real captured sample). Each captures the
+# first ("Total") column's number, which may contain comma thousands
+# separators — always run through _to_num(), never float() directly.
+_NUM = r"([\d,]+(?:\.\d+)?)"
 _PATTERNS = {
-    "request_count": re.compile(r">\s*request count\s+(\d+)"),
-    "p50_ms": re.compile(r">\s*response time 50th percentile\s+(-?\d+(?:\.\d+)?)"),
-    "p95_ms": re.compile(r">\s*response time 95th percentile\s+(-?\d+(?:\.\d+)?)"),
-    "p99_ms": re.compile(r">\s*response time 99th percentile\s+(-?\d+(?:\.\d+)?)"),
-    "mean_response_ms": re.compile(r">\s*mean response time\s+(-?\d+(?:\.\d+)?)"),
-    "mean_requests_per_sec": re.compile(r">\s*mean requests/sec\s+(-?\d+(?:\.\d+)?)"),
+    "request_count": re.compile(r">\s*request count\s*\|\s*" + _NUM),
+    "p50_ms": re.compile(r">\s*response time 50th percentile \(ms\)\s*\|\s*" + _NUM),
+    "p95_ms": re.compile(r">\s*response time 95th percentile \(ms\)\s*\|\s*" + _NUM),
+    "p99_ms": re.compile(r">\s*response time 99th percentile \(ms\)\s*\|\s*" + _NUM),
+    "mean_response_ms": re.compile(r">\s*mean response time \(ms\)\s*\|\s*" + _NUM),
+    "mean_requests_per_sec": re.compile(r">\s*mean throughput \(rps\)\s*\|\s*" + _NUM),
 }
-_OK_KO_PATTERN = re.compile(r"request count\s+\d+\s+\(OK=(\d+)\s+KO=(\d+)\s*\)")
+
+# "> Global | <total> | <ok> | <ko>" under the "---- Requests ----" section.
+# This line (unlike "Global Information"'s "request count" row, which prints
+# "-" for KO when there are none) prints real 0/N values in all three
+# columns, and is Gatling's own aggregate across all request types — so it's
+# the more reliable source for the OK/KO split. It also appears once per
+# periodic progress snapshot DURING the run, not just at the end, so take
+# the LAST match (the final tally), not the first.
+_GLOBAL_LINE = re.compile(r">\s*Global\s*\|\s*" + _NUM + r"\s*\|\s*" + _NUM + r"\s*\|\s*" + _NUM)
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
 def _parse_console_summary(stdout: str) -> dict:
+    stdout = _ANSI_ESCAPE.sub("", stdout)  # defensive: strip color codes if present
     missing = []
     values = {}
     for key, pattern in _PATTERNS.items():
@@ -90,22 +121,25 @@ def _parse_console_summary(stdout: str) -> dict:
         if not m:
             missing.append(key)
             continue
-        values[key] = float(m.group(1))
+        values[key] = _to_num(m.group(1))
 
-    ok_ko = _OK_KO_PATTERN.search(stdout)
-    if not ok_ko:
-        missing.append("ok_ko_split")
+    global_matches = list(_GLOBAL_LINE.finditer(stdout))
+    if not global_matches:
+        missing.append("global_ok_ko_line")
     else:
-        values["ok_count"] = int(ok_ko.group(1))
-        values["ko_count"] = int(ok_ko.group(2))
+        total, ok, ko = (_to_num(g) for g in global_matches[-1].groups())
+        values["request_count"] = total  # overrides the "request count" row above; same value, more trustworthy source
+        values["ok_count"] = int(ok)
+        values["ko_count"] = int(ko)
 
     if missing:
         tail = stdout[-4000:]
         raise GatlingRunError(
             "Could not find expected fields in Gatling console summary: "
-            f"{missing}. This almost certainly means the console output "
-            "format differs from what this parser was written against "
-            "(see module docstring — never verified against a real run). "
+            f"{missing}. This means the console output format differs from "
+            "what this parser expects (see module docstring for the format "
+            "this was last confirmed against, and its history of being "
+            "wrong once already). "
             f"Last 4000 chars of captured stdout for debugging:\n{tail}"
         )
     return values
