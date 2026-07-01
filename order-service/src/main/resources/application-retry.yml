@@ -1,0 +1,48 @@
+resilience4j:
+  circuitbreaker:
+    instances:
+      # Deliberately neutralized, same reasoning as application-none.yml and
+      # application-bulkhead.yml -- this profile exists to isolate retry's
+      # effect alone. Without this override the @CircuitBreaker annotation
+      # (always present, Phase 6) would fall back to Resilience4j's library
+      # defaults and could still trip, contaminating the "retry-only"
+      # condition with circuit-breaker behaviour.
+      inventoryService:
+        registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
+      paymentService:
+        registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
+  bulkhead:
+    instances:
+      # Neutralized (effectively unlimited) -- same maxConcurrentCalls: 1000
+      # used in application-none.yml, so this profile isn't also silently
+      # testing bulkhead capacity limits.
+      inventoryService:
+        maxConcurrentCalls: 1000
+      paymentService:
+        maxConcurrentCalls: 1000
+  retry:
+    instances:
+      # The pattern actually under test in this profile. Identical settings
+      # to application-combined.yml's retry block, so retry's own
+      # contribution is directly comparable between "retry alone" and
+      # "retry as part of combined".
+      inventoryService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      paymentService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2

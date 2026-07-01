@@ -12,3 +12,8 @@
 experiment-runner/results/dryrun_trials.csv
 experiment-runner/results/dryrun_trials.jsonl
 experiment-runner/results/run.log
+experiment-runner/results/full_run_stdout.log
+
+# Scratch debug output from manual diagnostic sessions (curl/log captures) --
+# not part of the reproducible pipeline.
+experiment-runner/debug/

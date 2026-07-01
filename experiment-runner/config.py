@@ -21,14 +21,19 @@ RESULTS_DIR = REPO_ROOT / "experiment-runner" / "results"
 # ── experimental design ─────────────────────────────────────────────────
 
 # Must match the Spring profile names in order-service/src/main/resources/
-# application-<profile>.yml exactly (Phase 6) — these are frozen.
-RESILIENCE_PROFILES = ["none", "circuit-breaker", "bulkhead", "combined"]
+# application-<profile>.yml exactly. "retry" added post-Phase-10-verification
+# (2026-07-01) at Pavan's request, to isolate retry-with-backoff's own effect
+# instead of only ever seeing it mixed into "combined" -- has the same CB/
+# bulkhead-neutralization treatment as "none"/"bulkhead" (see
+# application-retry.yml), verified as valid YAML but NOT yet run in a live
+# --smoke pass the way the original 4 profiles were.
+RESILIENCE_PROFILES = ["none", "circuit-breaker", "bulkhead", "retry", "combined"]
 
 # Must match the module names under chaos-scripts/scenarios/ (Phase 7).
 CHAOS_SCENARIOS = ["service_termination", "latency_injection", "partial_failure", "cascading_failure"]
 
 TRIALS_PER_CELL = 20
-TOTAL_TRIALS = len(RESILIENCE_PROFILES) * len(CHAOS_SCENARIOS) * TRIALS_PER_CELL  # 320
+TOTAL_TRIALS = len(RESILIENCE_PROFILES) * len(CHAOS_SCENARIOS) * TRIALS_PER_CELL  # 5 x 4 x 20 = 400
 
 # ── Gatling load profile (matches OrderSimulation.java defaults, Phase 8) ──
 
