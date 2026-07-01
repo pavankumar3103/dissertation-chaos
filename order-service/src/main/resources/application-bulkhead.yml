@@ -1,10 +1,27 @@
 resilience4j:
   circuitbreaker:
     instances:
+      # Deliberately neutralized -- same reasoning as application-none.yml.
+      # This profile is meant to test bulkhead ALONE; without this, the
+      # circuit breaker's un-overridden library defaults let it trip open
+      # too, contaminating the "bulkhead-only" condition with circuit
+      # breaker behaviour. Confirmed happening in a --smoke run
+      # (2026-07-01): bulkhead/latency_injection showed the same
+      # mass-fast-failure signature as "none"/latency_injection.
       inventoryService:
         registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
       paymentService:
         registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
   bulkhead:
     instances:
       inventoryService:

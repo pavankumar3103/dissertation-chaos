@@ -1,10 +1,32 @@
 resilience4j:
   circuitbreaker:
     instances:
+      # Deliberately neutralized. Without an explicit threshold override,
+      # this instance still inherits Resilience4j's library defaults
+      # (slidingWindowSize=100, failureRateThreshold=50%) and CAN trip open
+      # even in the "none" profile, since the @CircuitBreaker annotation on
+      # InventoryClient/PaymentClient is unconditional (Phase 6). Confirmed
+      # actually happening in a --smoke run (2026-07-01): under
+      # latency_injection, "none" produced thousands of near-instant
+      # CB-rejected failures instead of the expected slow, patternless
+      # timeouts -- meaning the "no pattern" baseline wasn't actually
+      # pattern-free. minimumNumberOfCalls is set far above what a single
+      # trial will ever generate, so the failure-rate check never actually
+      # evaluates, regardless of how badly downstream calls behave.
       inventoryService:
         registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
       paymentService:
         registerHealthIndicator: false
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 1000000
+        minimumNumberOfCalls: 1000000
+        failureRateThreshold: 100
+        slowCallRateThreshold: 100
   bulkhead:
     instances:
       inventoryService:
