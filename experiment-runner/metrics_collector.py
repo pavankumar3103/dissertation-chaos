@@ -10,8 +10,28 @@ resilience4j_circuitbreaker_calls_seconds_count, http_server_requests_seconds_co
 process_cpu_usage, jvm_memory_used_bytes) are not guessed — they're the
 exact names Pavan confirmed live against Prometheus's /api/v1/targets and
 a real order placed through the gateway, per Phase 9's ELI5 honest-caveats
-section (2026-06-30 verification run). The query windows / step sizes here
-are new and have NOT been run against a live trial yet.
+section (2026-06-30 verification run).
+
+STATUS AFTER THE FIRST FULL 400-TRIAL RUN (2026-07-03):
+- get_circuitbreaker_recovery() was broken (fixed below, see its own
+  docstring) — it never generated post-fault traffic, so a genuinely-open
+  CB could never be observed closing again. 0/100 trials where the CB
+  actually opened got a real recovery-time measurement.
+- get_resource_consumption() worked correctly for 4 of 5 profiles across
+  all 400 trials, but returned nothing for 65/80 circuit-breaker trials —
+  not a bug in this function, but a real gap in what Prometheus could
+  scrape from order-service during that window (see ELI5_LOG.md's Phase 10
+  update on the suspected HikariCP connection exhaustion under
+  circuit-breaker's uncapped bulkhead).
+- get_order_error_rate() is still an OPEN, undiagnosed issue: only 8/400
+  trials got any value at all (the rest returned None because `total`
+  came back 0 from the query_range call). This wasn't touched in this
+  round of fixes — gatling_error_rate already covers error-propagation
+  rate reliably across all 400 trials, so it wasn't blocking, but if this
+  matters for a Prometheus-side cross-check later, the PromQL query
+  itself (probably a label-matching or timing issue) needs live debugging
+  against a real Prometheus instance, which isn't possible from where
+  this was written.
 """
 
 import time
@@ -115,16 +135,31 @@ def get_circuitbreaker_recovery(
     max_wait_seconds: int = None,
 ) -> tuple:
     """Polls resilience4j_circuitbreaker_state from fault_removed_at onward
-    (real-time polling, not query_range, since this needs to observe live
-    state as it happens immediately after teardown) until both named
-    instances report state="closed", or max_wait_seconds elapses.
+    until both named instances report state="closed", or max_wait_seconds
+    elapses.
 
-    Returns (recovery_time_seconds_or_None, was_open_during_window_bool).
+    BUG FIXED (found after the first full 400-trial run, 2026-07-03): this
+    used to only poll state passively. Resilience4j's circuit breaker can
+    transition OPEN -> HALF_OPEN on a timer alone (automaticTransition...
+    Enabled: true), but HALF_OPEN -> CLOSED requires actual calls to
+    succeed (permittedNumberOfCallsInHalfOpenState) -- it will NOT close on
+    its own without traffic. Since Gatling has already stopped by the time
+    this runs, there was never any traffic to drive that transition, so
+    every trial where the CB genuinely opened recorded recovery_time as
+    None (checked against cb_was_open_during_trial across the full
+    dataset: all 100 trials where CB opened showed null recovery; all 300
+    where the value was populated were cases where CB never opened in the
+    first place and "recovered" trivially/meaninglessly). This version
+    actively fires a real probe order through the gateway on every poll
+    iteration, specifically so there's something for a half-open CB to
+    evaluate.
     """
     max_wait_seconds = max_wait_seconds or config.RECOVERY_WAIT_TIMEOUT_SECONDS
     deadline = time.monotonic() + max_wait_seconds
     was_open = False
     poll_start = time.monotonic()
+
+    probe_body = {"sku": "SKU-001", "quantity": 1, "totalAmount": 9.99}
 
     while time.monotonic() < deadline:
         all_closed = True
@@ -139,6 +174,17 @@ def get_circuitbreaker_recovery(
                 was_open = True
         if all_closed:
             return (time.monotonic() - poll_start), was_open
+
+        # Fire a real probe request so a half-open CB has a call to
+        # evaluate. Deliberately ignore the outcome here -- we only care
+        # about the CB's resulting *state*, read on the next loop
+        # iteration via the query above, not whether this one call
+        # succeeded.
+        try:
+            requests.post(f"{config.GATEWAY_BASE_URL}/orders", json=probe_body, timeout=10)
+        except requests.RequestException:
+            pass
+
         time.sleep(2)
 
     return None, was_open

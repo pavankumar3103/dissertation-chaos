@@ -6,6 +6,18 @@ spring:
     username: pavan-work
     password:
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # Diagnostic, added after the 400-trial run showed circuit-breaker's
+      # data collapsing to a suspiciously identical ~550 requests/trial
+      # across every chaos scenario from partway through that profile
+      # onward, at exactly the point Prometheus lost the ability to scrape
+      # order-service's own resource metrics -- consistent with a HikariCP
+      # connection pool exhaustion/leak that "none" (bulkhead also
+      # uncapped, but circuit breaker never legitimately opens) doesn't
+      # trigger. leak-detection-threshold makes HikariCP log a full stack
+      # trace for any connection held longer than 30s instead of silently
+      # exhausting the pool, so a recurrence is diagnosed, not guessed at.
+      leak-detection-threshold: 30000
   jpa:
     hibernate:
       ddl-auto: create-drop
