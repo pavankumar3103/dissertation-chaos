@@ -17,3 +17,11 @@ experiment-runner/results/full_run_stdout.log
 # Scratch debug output from manual diagnostic sessions (curl/log captures) --
 # not part of the reproducible pipeline.
 experiment-runner/debug/
+
+# Pavan's personal learning docs — kept locally, not pushed to GitHub.
+# Untracked as of 2026-07-09; note they still exist in earlier pushed
+# commit history on origin/master (removing them from tracking here does
+# not erase that history — a full scrub would need a git history rewrite
+# + force-push, which wasn't requested).
+ELI5_LOG.md
+CONCEPTS_PRIMER.md
