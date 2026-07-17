@@ -25,3 +25,4 @@ experiment-runner/debug/
 # + force-push, which wasn't requested).
 ELI5_LOG.md
 CONCEPTS_PRIMER.md
+stats-analysis/.venv/

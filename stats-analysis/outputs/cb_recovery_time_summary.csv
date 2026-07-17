@@ -1,0 +1,4 @@
+resilience_profile,count,mean,median,std,min,max
+retry,3,12.825,15.757,5.913,6.019,16.7
+circuit-breaker,22,18.128,17.898,3.371,8.35,27.261
+combined,20,16.991,17.898,2.038,12.019,20.201

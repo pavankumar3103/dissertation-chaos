@@ -1,0 +1,21 @@
+scenario,metric,shapiro_all_normal,levene_p,equal_variance,recommended_test
+service_termination,gatling_error_rate,,,,NONE (constant value across all groups)
+service_termination,gatling_p99_ms,False,0.3417,True,Kruskal-Wallis
+service_termination,gatling_mean_requests_per_sec,False,0.0,False,Kruskal-Wallis
+service_termination,peak_process_cpu_usage,False,0.0,False,Kruskal-Wallis
+service_termination,peak_jvm_heap_used_bytes,False,0.0001,False,Kruskal-Wallis
+latency_injection,gatling_error_rate,False,0.1159,True,Kruskal-Wallis
+latency_injection,gatling_p99_ms,False,0.0,False,Kruskal-Wallis
+latency_injection,gatling_mean_requests_per_sec,False,0.0005,False,Kruskal-Wallis
+latency_injection,peak_process_cpu_usage,False,0.0703,True,Kruskal-Wallis
+latency_injection,peak_jvm_heap_used_bytes,False,0.0431,False,Kruskal-Wallis
+partial_failure,gatling_error_rate,False,0.0664,True,Kruskal-Wallis
+partial_failure,gatling_p99_ms,False,0.2644,True,Kruskal-Wallis
+partial_failure,gatling_mean_requests_per_sec,False,0.1539,True,Kruskal-Wallis
+partial_failure,peak_process_cpu_usage,False,0.1037,True,Kruskal-Wallis
+partial_failure,peak_jvm_heap_used_bytes,False,0.0001,False,Kruskal-Wallis
+cascading_failure,gatling_error_rate,False,0.0,False,Kruskal-Wallis
+cascading_failure,gatling_p99_ms,False,0.0349,False,Kruskal-Wallis
+cascading_failure,gatling_mean_requests_per_sec,False,0.057,True,Kruskal-Wallis
+cascading_failure,peak_process_cpu_usage,False,0.5265,True,Kruskal-Wallis
+cascading_failure,peak_jvm_heap_used_bytes,False,0.0129,False,Kruskal-Wallis

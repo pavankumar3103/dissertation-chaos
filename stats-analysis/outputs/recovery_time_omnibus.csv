@@ -1,0 +1,8 @@
+,0
+h_stat,6.2132015810276755
+p_value,0.04475282129662933
+significant,True
+n_retry,3
+n_circuit_breaker,22
+n_combined,20
+caveat,retry n=3 is very small; interpret any retry-involving pairwise result cautiously.
